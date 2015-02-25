@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
@@ -54,12 +55,10 @@ public class ESMovieManager implements IMovieManager {
 
 		} catch (Exception e) {
 			e.printStackTrace();
-		} 
+		}
 
 		return null;
 	}
-
-	
 
 	/**
 	 * Get movies with the specified search string. If the search does not
@@ -68,8 +67,30 @@ public class ESMovieManager implements IMovieManager {
 	public List<Movie> searchMovies(String searchString, String field) {
 		List<Movie> result = new ArrayList<Movie>();
 
-		// TODO: Implement search movies using ElasticSearch
+		HttpClient httpClient = new DefaultHttpClient();
+		HttpPost httpPost;
+		try {
+			httpPost = createSearchRequest(searchString, field);
+			HttpResponse response;
+
+			response = httpClient.execute(httpPost);
+			SearchResponse<Movie> sr = parseSearchResponse(response);
+			Hits<Movie> hits = sr.getHits();
+			result.add(hits.getHits().get(0).getSource());
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			throw new RuntimeException(e);
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			throw new RuntimeException(e);
+		}
+
+	
 		
+
 		return result;
 	}
 
@@ -117,8 +138,9 @@ public class ESMovieManager implements IMovieManager {
 	/**
 	 * Creates a search request from a search string and a field
 	 */
-	private HttpPost createSearchRequest(String searchString, String field)	throws UnsupportedEncodingException {
-		
+	private HttpPost createSearchRequest(String searchString, String field)
+			throws UnsupportedEncodingException {
+
 		HttpPost searchRequest = new HttpPost(SEARCH_URL);
 
 		String[] fields = null;
@@ -126,9 +148,10 @@ public class ESMovieManager implements IMovieManager {
 			fields = new String[1];
 			fields[0] = field;
 		}
-		
-		SimpleSearchCommand command = new SimpleSearchCommand(searchString,	fields);
-		
+
+		SimpleSearchCommand command = new SimpleSearchCommand(searchString,
+				fields);
+
 		String query = command.getJsonCommand();
 		Log.i(TAG, "Json command: " + query);
 
@@ -140,34 +163,36 @@ public class ESMovieManager implements IMovieManager {
 
 		return searchRequest;
 	}
-	
+
 	private SearchHit<Movie> parseMovieHit(HttpResponse response) {
-		
+
 		try {
 			String json = getEntityContent(response);
-			Type searchHitType = new TypeToken<SearchHit<Movie>>() {}.getType();
-			
+			Type searchHitType = new TypeToken<SearchHit<Movie>>() {
+			}.getType();
+
 			SearchHit<Movie> sr = gson.fromJson(json, searchHitType);
 			return sr;
-		} 
-		catch (IOException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
 
 	/**
 	 * Parses the response of a search
 	 */
-	private SearchResponse<Movie> parseSearchResponse(HttpResponse response) throws IOException {
+	private SearchResponse<Movie> parseSearchResponse(HttpResponse response)
+			throws IOException {
 		String json;
 		json = getEntityContent(response);
 
 		Type searchResponseType = new TypeToken<SearchResponse<Movie>>() {
 		}.getType();
-		
-		SearchResponse<Movie> esResponse = gson.fromJson(json, searchResponseType);
+
+		SearchResponse<Movie> esResponse = gson.fromJson(json,
+				searchResponseType);
 
 		return esResponse;
 	}
@@ -176,7 +201,8 @@ public class ESMovieManager implements IMovieManager {
 	 * Gets content from an HTTP response
 	 */
 	public String getEntityContent(HttpResponse response) throws IOException {
-		BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		BufferedReader rd = new BufferedReader(new InputStreamReader(response
+				.getEntity().getContent()));
 
 		StringBuffer result = new StringBuffer();
 		String line = "";
